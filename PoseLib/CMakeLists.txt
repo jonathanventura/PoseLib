@@ -29,7 +29,9 @@ set(SOURCES
     solvers/relpose_upright_planar_2pt.cc
     solvers/relpose_upright_planar_3pt.cc
     solvers/relpose_8pt.cc
+    solvers/relpose_common.cc
     solvers/relpose_5pt.cc
+    solvers/relpose_2aff.cc
     solvers/relpose_monodepth_3pt.cc
     solvers/relpose_7pt.cc
     solvers/relpose_6pt_focal.cc
