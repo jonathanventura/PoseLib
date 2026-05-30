@@ -176,6 +176,7 @@ struct HomographyOptions {
 
 typedef Eigen::Vector2d Point2D;
 typedef Eigen::Vector3d Point3D;
+typedef Eigen::Matrix2d Affine2D;
 
 // Used to store pairwise matches for generalized pose estimation
 struct PairwiseMatches {

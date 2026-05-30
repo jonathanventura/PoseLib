@@ -51,6 +51,47 @@ estimate_relative_pose_wrapper(const std::vector<Eigen::Vector2d> &points2D_1,
                                           initial_pose);
 }
 
+
+std::pair<CameraPose, py::dict> estimate_relative_pose_affine_wrapper(const std::vector<Eigen::Vector2d> &points2D_1,
+                                                                      const std::vector<Eigen::Vector2d> &points2D_2,
+                                                                      const std::vector<Eigen::Matrix2d> &affine2D_12,
+                                                                      const Camera &camera1, const Camera &camera2,
+                                                                      const py::dict &opt_dict,
+                                                                      const std::optional<CameraPose> &initial_pose) {
+
+    RelativePoseOptions opt;
+    update_relative_pose_options(opt_dict, opt);
+
+    CameraPose pose;
+    if (initial_pose.has_value()) {
+        pose = initial_pose.value();
+        opt.ransac.score_initial_model = true;
+    }
+    std::vector<char> inlier_mask;
+
+    py::gil_scoped_release release;
+    RansacStats stats =
+        estimate_relative_pose_affine(points2D_1, points2D_2, affine2D_12, camera1, camera2, opt, &pose, &inlier_mask);
+    py::gil_scoped_acquire acquire;
+
+    py::dict output_dict;
+    write_to_dict(stats, output_dict);
+    output_dict["inliers"] = convert_inlier_vector(inlier_mask);
+    return std::make_pair(pose, output_dict);
+}
+
+std::pair<CameraPose, py::dict>
+estimate_relative_pose_affine_wrapper(const std::vector<Eigen::Vector2d> &points2D_1,
+                                      const std::vector<Eigen::Vector2d> &points2D_2, const std::vector<Eigen::Matrix2d> &affine2D_12,
+                                      const py::dict &camera1_dict, const py::dict &camera2_dict, const py::dict &opt_dict,
+                                      const std::optional<CameraPose> &initial_pose) {
+    Camera camera1 = camera_from_dict(camera1_dict);
+    Camera camera2 = camera_from_dict(camera2_dict);
+
+    return estimate_relative_pose_affine_wrapper(points2D_1, points2D_2, affine2D_12, camera1, camera2, opt_dict,
+                                                 initial_pose);
+}
+
 std::pair<MonoDepthTwoViewGeometry, py::dict> estimate_monodepth_relative_pose_wrapper(
     const std::vector<Eigen::Vector2d> &points2D_1, const std::vector<Eigen::Vector2d> &points2D_2,
     const std::vector<double> &depth_1, const std::vector<double> &depth_2, const Camera &camera1,
@@ -416,6 +457,23 @@ void register_relative_pose(py::module &m) {
                           const py::dict &, const py::dict &, const std::optional<CameraPose> &>(
             &estimate_relative_pose_wrapper),
         py::arg("points2D_1"), py::arg("points2D_2"), py::arg("camera1_dict"), py::arg("camera2_dict"),
+        py::arg("opt") = py::dict(), py::arg("initial_pose") = py::none(),
+        "Relative pose estimation with non-linear refinement.");
+
+    m.def("estimate_relative_pose_affine",
+          py::overload_cast<const std::vector<Eigen::Vector2d> &, const std::vector<Eigen::Vector2d> &, const std::vector<Eigen::Matrix2d> &, const Camera &,
+                            const Camera &, const py::dict &, const std::optional<CameraPose> &>(
+              &estimate_relative_pose_affine_wrapper),
+          py::arg("points2D_1"), py::arg("points2D_2"), py::arg("affine2D_12"), py::arg("camera1"), py::arg("camera2"),
+          py::arg("opt") = py::dict(), py::arg("initial_pose") = py::none(),
+          "Relative pose estimation with non-linear refinement.");
+
+    m.def(
+        "estimate_relative_pose_affine",
+        py::overload_cast<const std::vector<Eigen::Vector2d> &, const std::vector<Eigen::Vector2d> &, const std::vector<Eigen::Matrix2d> &, const py::dict &,
+                          const py::dict &, const py::dict &, const std::optional<CameraPose> &>(
+            &estimate_relative_pose_affine_wrapper),
+        py::arg("points2D_1"), py::arg("points2D_2"), py::arg("affine2D_12"), py::arg("camera1_dict"), py::arg("camera2_dict"),
         py::arg("opt") = py::dict(), py::arg("initial_pose") = py::none(),
         "Relative pose estimation with non-linear refinement.");
 

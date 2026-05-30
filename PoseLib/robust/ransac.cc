@@ -167,6 +167,20 @@ RansacStats ransac_relpose(const std::vector<Point2D> &x1, const std::vector<Poi
     return stats;
 }
 
+RansacStats ransac_relpose_affine(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, const std::vector<Affine2D> &A,
+                           const RelativePoseOptions &opt, CameraPose *best_model, std::vector<char> *best_inliers) {
+    if (!opt.ransac.score_initial_model) {
+        best_model->q << 1.0, 0.0, 0.0, 0.0;
+        best_model->t.setZero();
+    }
+    RelativePoseAffineEstimator estimator(opt, x1, x2, A);
+    RansacStats stats = ransac<RelativePoseAffineEstimator>(estimator, opt.ransac, best_model);
+
+    get_inliers(*best_model, x1, x2, opt.max_error * opt.max_error, best_inliers);
+
+    return stats;
+}
+
 RansacStats ransac_monodepth_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                      const std::vector<double> &d1, const std::vector<double> &d2,
                                      const MonoDepthRelativePoseOptions &opt, MonoDepthTwoViewGeometry *best_model,

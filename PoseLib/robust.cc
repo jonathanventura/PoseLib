@@ -313,6 +313,53 @@ RansacStats estimate_relative_pose(const std::vector<Point2D> &x1, const std::ve
     return stats;
 }
 
+RansacStats estimate_relative_pose_affine(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, const std::vector<Affine2D> &A,
+                                          const Camera &camera1, const Camera &camera2, const RelativePoseOptions &opt,
+                                          CameraPose *pose, std::vector<char> *inliers) {
+
+    const size_t num_pts = x1.size();
+    RansacStats stats;
+
+    double scale = 0.5 * (1.0 / camera1.focal() + 1.0 / camera2.focal());
+
+    RelativePoseOptions opt_scaled = opt;
+    opt_scaled.max_error *= scale;
+    opt_scaled.bundle.loss_scale *= scale;
+
+    // We undistort points first
+    std::vector<Point2D> x1_calib(num_pts);
+    std::vector<Point2D> x2_calib(num_pts);
+    for (size_t k = 0; k < num_pts; ++k) {
+        camera1.unproject(x1[k], &x1_calib[k]);
+        camera2.unproject(x2[k], &x2_calib[k]);
+    }
+
+    std::vector<Affine2D> A_calib(num_pts);
+    for (size_t k = 0; k < num_pts; ++k) {
+        A_calib[k] = A[k]*camera1.focal()/camera2.focal();
+    }
+
+    stats = ransac_relpose_affine(x1_calib, x2_calib, A_calib, opt_scaled, pose, inliers);
+
+    if (stats.num_inliers > 5) {
+        // Collect inlier for additional bundle adjustment
+        std::vector<Point2D> x1_inliers;
+        std::vector<Point2D> x2_inliers;
+        x1_inliers.reserve(stats.num_inliers);
+        x2_inliers.reserve(stats.num_inliers);
+
+        for (size_t k = 0; k < num_pts; ++k) {
+            if (!(*inliers)[k])
+                continue;
+            x1_inliers.push_back(x1_calib[k]);
+            x2_inliers.push_back(x2_calib[k]);
+        }
+
+        refine_relpose(x1_inliers, x2_inliers, pose, opt_scaled.bundle);
+    }
+    return stats;
+}
+
 RansacStats estimate_monodepth_relative_pose(const std::vector<Point2D> &points2D_1,
                                              const std::vector<Point2D> &points2D_2, const std::vector<double> &depth_1,
                                              const std::vector<double> &depth_2, const Camera &camera1,
