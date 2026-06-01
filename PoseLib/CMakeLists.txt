@@ -99,6 +99,7 @@ set(HEADERS_PUBLIC
     solvers/relpose_upright_planar_3pt.h
     solvers/relpose_8pt.h
     solvers/relpose_5pt.h
+    solvers/relpose_2aff.h
     solvers/relpose_monodepth_3pt.h
     solvers/relpose_7pt.h
     solvers/relpose_6pt_focal.h
