@@ -125,6 +125,52 @@ RansacStats estimate_absolute_pose(const std::vector<Point2D> &points2D, const s
     return stats;
 }
 
+RansacStats estimate_absolute_pose_from_affine(const std::vector<Point2D> &points2D, const std::vector<Point3D> &points3D,
+                                   const std::vector<Point3D> &normals, const std::vector<Affine2D> &affine,
+                                   AbsolutePoseOptions opt, Image *image, std::vector<char> *inliers) {
+    AbsolutePoseOptions opt_scaled = opt;
+
+    std::vector<Point2D> points2D_norm(points2D.size());
+    for (size_t k = 0; k < points2D.size(); ++k) {
+        image->camera.unproject(points2D[k], &points2D_norm[k]);
+    }
+
+    double scale = 1.0 / image->camera.focal();
+    opt_scaled.max_error *= scale;
+
+    std::vector<Affine2D> affine_norm(points2D.size());
+    for (size_t k = 0; k < points2D.size(); ++k) {
+        affine_norm[k] = affine[k] * scale;
+    }
+
+    RansacStats stats;
+    stats = ransac_pnac(points2D_norm, points3D, normals, affine_norm, opt_scaled, &(image->pose), inliers);
+
+    if (stats.num_inliers > 3) {
+        // Collect inlier for additional bundle adjustment
+        std::vector<Point2D> points2D_inliers;
+        std::vector<Point3D> points3D_inliers;
+        points2D_inliers.reserve(points2D.size());
+        points3D_inliers.reserve(points3D.size());
+
+        // We re-scale with focal length to improve numerics in the opt.
+        scale = 1.0 / image->camera.focal();
+        opt_scaled.bundle.loss_scale = opt.bundle.loss_scale * scale;
+        for (size_t k = 0; k < points2D.size(); ++k) {
+            if (!(*inliers)[k])
+                continue;
+            points2D_inliers.push_back(points2D[k] * scale);
+            points3D_inliers.push_back(points3D[k]);
+        }
+
+        image->camera.rescale(scale);
+        bundle_adjust(points2D_inliers, points3D_inliers, image, opt_scaled.bundle);
+        image->camera.rescale(1.0 / scale);
+    }
+
+    return stats;
+}
+
 RansacStats estimate_generalized_absolute_pose(const std::vector<std::vector<Point2D>> &points2D,
                                                const std::vector<std::vector<Point3D>> &points3D,
                                                const std::vector<CameraPose> &camera_ext,

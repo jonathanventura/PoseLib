@@ -56,6 +56,24 @@ RansacStats ransac_pnp(const std::vector<Point2D> &x, const std::vector<Point3D>
     return stats;
 }
 
+RansacStats ransac_pnac(const std::vector<Point2D> &x, const std::vector<Point3D> &X, 
+                        const std::vector<Point3D> &n, const std::vector<Affine2D> &A,
+                        const AbsolutePoseOptions &opt,
+                        CameraPose *best_model, std::vector<char> *best_inliers) {
+
+    if (!opt.ransac.score_initial_model) {
+        best_model->q << 1.0, 0.0, 0.0, 0.0;
+        best_model->t.setZero();
+    }
+    AbsolutePoseFromAffineEstimator estimator(opt, x, X, n, A);
+    RansacStats stats = ransac<AbsolutePoseFromAffineEstimator>(estimator, opt.ransac, best_model);
+
+    get_inliers(*best_model, x, X, opt.max_error * opt.max_error, best_inliers);
+
+    return stats;
+}
+
+
 RansacStats ransac_pnpf(const std::vector<Point2D> &x, const std::vector<Point3D> &X, const AbsolutePoseOptions &opt,
                         Image *best_model, std::vector<char> *best_inliers) {
 

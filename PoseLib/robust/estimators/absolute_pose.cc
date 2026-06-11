@@ -36,6 +36,7 @@
 #include "PoseLib/solvers/p35pf.h"
 #include "PoseLib/solvers/p3ll.h"
 #include "PoseLib/solvers/p3p.h"
+#include "PoseLib/solvers/p1ac.h"
 #include "PoseLib/solvers/p4pf.h"
 #include "PoseLib/solvers/p5lp_radial.h"
 #include "PoseLib/solvers/p5pf.h"
@@ -58,6 +59,31 @@ double AbsolutePoseEstimator::score_model(const CameraPose &pose, size_t *inlier
 }
 
 void AbsolutePoseEstimator::refine_model(CameraPose *pose) const {
+    BundleOptions bundle_opt;
+    bundle_opt.loss_type = BundleOptions::LossType::TRUNCATED;
+    bundle_opt.loss_scale = opt.max_error;
+    bundle_opt.max_iterations = 25;
+
+    // TODO: for high outlier scenarios, make a copy of (x,X) and find points close to inlier threshold
+    // TODO: experiment with good thresholds for copy vs iterating full point set
+    bundle_adjust(x, X, pose, bundle_opt);
+}
+
+void AbsolutePoseFromAffineEstimator::generate_models(std::vector<CameraPose> *models) {
+    models->clear();
+    sampler.generate_sample(&sample);
+    xs[0] = x[sample[0]].homogeneous().normalized();
+    Xs[0] = X[sample[0]];
+    ns[0] = n[sample[0]];
+    As[0] = A[sample[0]];
+    p1ac(xs[0], Xs[0], ns[0], As[0], models);
+}
+
+double AbsolutePoseFromAffineEstimator::score_model(const CameraPose &pose, size_t *inlier_count) const {
+    return compute_msac_score(pose, x, X, opt.max_error * opt.max_error, inlier_count);
+}
+
+void AbsolutePoseFromAffineEstimator::refine_model(CameraPose *pose) const {
     BundleOptions bundle_opt;
     bundle_opt.loss_type = BundleOptions::LossType::TRUNCATED;
     bundle_opt.loss_scale = opt.max_error;

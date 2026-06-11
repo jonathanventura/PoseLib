@@ -65,6 +65,41 @@ class AbsolutePoseEstimator {
     std::vector<size_t> sample;
 };
 
+class AbsolutePoseFromAffineEstimator {
+  public:
+    AbsolutePoseFromAffineEstimator(const AbsolutePoseOptions &opt, const std::vector<Point2D> &points2D,
+                          const std::vector<Point3D> &points3D, const std::vector<Point3D> &normals, const std::vector<Affine2D> &affine)
+        : num_data(points2D.size()), opt(opt), x(points2D), X(points3D), n(normals), A(affine), sampler(num_data, sample_sz, opt.ransac) {
+        xs.resize(sample_sz);
+        Xs.resize(sample_sz);
+        ns.resize(sample_sz);
+        As.resize(sample_sz);
+
+        sample.resize(sample_sz);
+    }
+
+    void generate_models(std::vector<CameraPose> *models);
+    double score_model(const CameraPose &pose, size_t *inlier_count) const;
+    void refine_model(CameraPose *pose) const;
+
+    const size_t sample_sz = 1;
+    const size_t num_data;
+
+  private:
+    const AbsolutePoseOptions &opt;
+    const std::vector<Point2D> &x;
+    const std::vector<Point3D> &X;
+    const std::vector<Point3D> &n;
+    const std::vector<Affine2D> &A;
+
+    RandomSampler sampler;
+
+    // pre-allocated vectors for sampling
+    std::vector<Point3D> xs, Xs, ns;
+    std::vector<Affine2D> As;
+    std::vector<size_t> sample;
+};
+
 // This is a variant of the AbsolutePoseEstimator that estimates the focal length
 // as well, using the SIMPLE_PINHOLE model.
 // Assumes principal point is at (0, 0)

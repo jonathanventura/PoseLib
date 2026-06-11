@@ -6,6 +6,7 @@ set(SOURCES
     solvers/p2p1ll.cc
     solvers/p2p2pl.cc
     solvers/p3ll.cc
+    solvers/p1ac.cc
     solvers/p3p.cc
     solvers/p3p_lambdatwist.cc
     solvers/p4pf.cc
