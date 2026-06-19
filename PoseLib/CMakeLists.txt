@@ -32,6 +32,7 @@ set(SOURCES
     solvers/relpose_8pt.cc
     solvers/relpose_common.cc
     solvers/relpose_5pt.cc
+    solvers/relpose_1aff.cc
     solvers/relpose_2aff.cc
     solvers/relpose_monodepth_3pt.cc
     solvers/relpose_7pt.cc
@@ -75,6 +76,7 @@ set(HEADERS_PUBLIC
     solvers/p2p1ll.h
     solvers/p2p2pl.h
     solvers/p3ll.h
+    solvers/p1ac.h
     solvers/p3p.h
     solvers/p3p_lambdatwist.h
     solvers/p4pf.h
@@ -100,6 +102,7 @@ set(HEADERS_PUBLIC
     solvers/relpose_upright_planar_3pt.h
     solvers/relpose_8pt.h
     solvers/relpose_5pt.h
+    solvers/relpose_1aff.h
     solvers/relpose_2aff.h
     solvers/relpose_monodepth_3pt.h
     solvers/relpose_7pt.h

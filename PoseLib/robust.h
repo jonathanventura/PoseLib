@@ -82,6 +82,12 @@ RansacStats estimate_relative_pose_affine(const std::vector<Point2D> &points2D_1
                                    const Camera &camera1, const Camera &camera2, const RelativePoseOptions &opt,
                                    CameraPose *relative_pose, std::vector<char> *inliers);
 
+                                   // Estimates relative pose using LO-RANSAC followed by non-linear refinement
+// Threshold for Sampson error is set by RansacOptions.max_epipolar_error
+RansacStats estimate_relative_pose_affine_with_normal(const std::vector<Point2D> &points2D_1, const std::vector<Point2D> &points2D_2, const std::vector<Point3D> &normals_1, const std::vector<Affine2D> &affine2D_12,
+                                   const Camera &camera1, const Camera &camera2, const RelativePoseOptions &opt,
+                                   CameraPose *relative_pose, std::vector<char> *inliers);
+
 // Estimates relative geometry from using points and estimated depth using LO-RANSAC followed by non-linear refinement
 // Threshold for Sampson error is set by RansacOptions.max_epipolar_error
 // MonoDepth relative pose estimation with known calibration

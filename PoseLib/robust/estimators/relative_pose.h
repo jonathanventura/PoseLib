@@ -100,6 +100,44 @@ class RelativePoseAffineEstimator {
     std::vector<size_t> sample;
 };
 
+// Estimator for calibrated relative pose (essential matrix)
+// Uses Sampson error for scoring and refinement
+class RelativePoseAffineWithNormalEstimator {
+  public:
+    RelativePoseAffineWithNormalEstimator(const RelativePoseOptions &opt, const std::vector<Point2D> &points2D_1,
+                                const std::vector<Point2D> &points2D_2, const std::vector<Point3D> &normals_1, 
+                                const std::vector<Affine2D> &affine2D_12)
+        : num_data(points2D_1.size()), opt(opt), x1(points2D_1), x2(points2D_2), n(normals_1), A(affine2D_12),
+          sampler(num_data, sample_sz, opt.ransac) {
+        x1s.resize(sample_sz);
+        x2s.resize(sample_sz);
+        ns.resize(sample_sz);
+        As.resize(sample_sz);
+        sample.resize(sample_sz);
+    }
+
+    void generate_models(std::vector<CameraPose> *models);
+    double score_model(const CameraPose &pose, size_t *inlier_count) const;
+    void refine_model(CameraPose *pose) const;
+
+    const size_t sample_sz = 1;
+    const size_t num_data;
+
+  private:
+    const RelativePoseOptions &opt;
+    const std::vector<Point2D> &x1;
+    const std::vector<Point2D> &x2;
+    const std::vector<Point3D> &n;
+    const std::vector<Affine2D> &A;
+
+    RandomSampler sampler;
+    // pre-allocated vectors for sampling
+    std::vector<Eigen::Vector3d> x1s, x2s;
+    std::vector<Eigen::Vector3d> ns;
+    std::vector<Affine2D> As;
+    std::vector<size_t> sample;
+};
+
 // Estimator for relative pose (essential matrix) with given cameras
 // Uses Tangent Sampson error for scoring and refinement
 class CameraRelativePoseEstimator {

@@ -33,6 +33,7 @@
 #include "PoseLib/solvers/gen_relpose_5p1pt.h"
 #include "PoseLib/solvers/p3p.h"
 #include "PoseLib/solvers/relpose_5pt.h"
+#include "PoseLib/solvers/relpose_1aff.h"
 #include "PoseLib/solvers/relpose_2aff.h"
 #include "PoseLib/solvers/relpose_6pt_focal.h"
 #include "PoseLib/solvers/relpose_7pt.h"
@@ -102,6 +103,48 @@ double RelativePoseAffineEstimator::score_model(const CameraPose &pose, size_t *
 }
 
 void RelativePoseAffineEstimator::refine_model(CameraPose *pose) const {
+    BundleOptions bundle_opt;
+    bundle_opt.loss_type = BundleOptions::LossType::TRUNCATED;
+    bundle_opt.loss_scale = opt.max_error;
+    bundle_opt.max_iterations = 25;
+
+    // Find approximate inliers and bundle over these with a truncated loss
+    std::vector<char> inliers;
+    int num_inl = get_inliers(*pose, x1, x2, 5 * (opt.max_error * opt.max_error), &inliers);
+    std::vector<Eigen::Vector2d> x1_inlier, x2_inlier;
+    x1_inlier.reserve(num_inl);
+    x2_inlier.reserve(num_inl);
+
+    if (num_inl <= 5) {
+        return;
+    }
+
+    for (size_t pt_k = 0; pt_k < x1.size(); ++pt_k) {
+        if (inliers[pt_k]) {
+            x1_inlier.push_back(x1[pt_k]);
+            x2_inlier.push_back(x2[pt_k]);
+        }
+    }
+    refine_relpose(x1_inlier, x2_inlier, pose, bundle_opt);
+}
+
+void RelativePoseAffineWithNormalEstimator::generate_models(std::vector<CameraPose> *models) {
+    models->clear();
+    sampler.generate_sample(&sample);
+    for (size_t k = 0; k < sample_sz; ++k) {
+        x1s[k] = x1[sample[k]].homogeneous().normalized();
+        x2s[k] = x2[sample[k]].homogeneous().normalized();
+        ns[k] = n[sample[k]];
+        As[k] = A[sample[k]];
+    }
+    relpose_1aff(x1s[0], x2s[0], ns[0], As[0], models);
+}
+
+double RelativePoseAffineWithNormalEstimator::score_model(const CameraPose &pose, size_t *inlier_count) const {
+    return compute_sampson_msac_score(pose, x1, x2, opt.max_error * opt.max_error, inlier_count);
+}
+
+void RelativePoseAffineWithNormalEstimator::refine_model(CameraPose *pose) const {
     BundleOptions bundle_opt;
     bundle_opt.loss_type = BundleOptions::LossType::TRUNCATED;
     bundle_opt.loss_scale = opt.max_error;
