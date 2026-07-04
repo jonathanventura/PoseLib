@@ -47,6 +47,8 @@ struct RansacOptions {
     size_t max_prosac_iterations = 100000;
     // Whether to treat the input 'best_model' as an initial model and score it before running the main RANSAC loop
     bool score_initial_model = false;
+    bool use_lo = true;
+    bool final_lsq = true;
 };
 
 struct RansacStats {

@@ -37,6 +37,8 @@ inline void update_ransac_options(const py::dict &input, RansacOptions &ransac_o
     update(input, "progressive_sampling", ransac_opt.progressive_sampling);
     update(input, "max_prosac_iterations", ransac_opt.max_prosac_iterations);
     // "score_initial_model" purposely omitted
+    update(input, "use_lo", ransac_opt.use_lo);
+    update(input, "final_lsq", ransac_opt.final_lsq);
 }
 
 inline void update_bundle_options(const py::dict &input, BundleOptions &bundle_opt) {

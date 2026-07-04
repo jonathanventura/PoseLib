@@ -135,15 +135,17 @@ void score_models(const Solver &estimator, const std::vector<Model> &models, con
     if (best_model_ind == -1)
         return;
 
-    // Refinement
-    Model refined_model = models[best_model_ind];
-    estimator.refine_model(&refined_model);
-    stats.refinements++;
-    double refined_msac_score = estimator.score_model(refined_model, &inlier_count);
-    if (refined_msac_score < stats.model_score) {
-        stats.model_score = refined_msac_score;
-        stats.num_inliers = inlier_count;
-        *best_model = refined_model;
+    if (opt.use_lo) {
+        // Refinement
+        Model refined_model = models[best_model_ind];
+        estimator.refine_model(&refined_model);
+        stats.refinements++;
+        double refined_msac_score = estimator.score_model(refined_model, &inlier_count);
+        if (refined_msac_score < stats.model_score) {
+            stats.model_score = refined_msac_score;
+            stats.num_inliers = inlier_count;
+            *best_model = refined_model;
+        }
     }
 
     // update number of iterations
@@ -187,16 +189,18 @@ RansacStats ransac(Solver &estimator, const RansacOptions &opt, Model *best_mode
         score_models(estimator, models, opt, state, stats, best_model);
     }
 
-    // Final refinement
-    Model refined_model = *best_model;
-    estimator.refine_model(&refined_model);
-    stats.refinements++;
-    double refined_msac_score = estimator.score_model(refined_model, &inlier_count);
-    if (refined_msac_score < stats.model_score) {
-        *best_model = refined_model;
-        stats.num_inliers = inlier_count;
+    if (opt.final_lsq) {
+        // Final refinement
+        Model refined_model = *best_model;
+        estimator.refine_model(&refined_model);
+        stats.refinements++;
+        double refined_msac_score = estimator.score_model(refined_model, &inlier_count);
+        if (refined_msac_score < stats.model_score) {
+            *best_model = refined_model;
+            stats.num_inliers = inlier_count;
+        }
     }
-
+    
     return stats;
 }
 
