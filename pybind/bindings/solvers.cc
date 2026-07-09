@@ -11,6 +11,13 @@ namespace py = pybind11;
 namespace poselib {
 namespace {
 
+Eigen::Vector3d normal_1aff_wrapper(const Eigen::Vector3d &x, const Eigen::Vector3d &X, const Eigen::Matrix2d &A, const Eigen::Matrix3d &R, const Eigen::Vector3d &t )
+{
+    Eigen::Vector3d output;
+    normal_1aff(x, X, A, R, t, &output );
+    return output;
+}
+
 std::vector<CameraPose> p3p_wrapper(const std::vector<Eigen::Vector3d> &x, const std::vector<Eigen::Vector3d> &X) {
     std::vector<CameraPose> output;
     p3p(x, X, &output);
@@ -302,6 +309,7 @@ std::vector<ProjectiveImagePair> relpose_k2Fk1_10pt_wrapper(const std::vector<Ei
 
 void register_solvers(py::module &m) {
     // Minimal solvers
+    m.def("normal_1aff", &normal_1aff_wrapper, py::arg("x"), py::arg("X"), py::arg("A"), py::arg("R"), py::arg("t"), py::call_guard<py::gil_scoped_release>());
     m.def("p3p", &p3p_wrapper, py::arg("x"), py::arg("X"), py::call_guard<py::gil_scoped_release>());
     m.def("gp3p", &gp3p_wrapper, py::arg("p"), py::arg("x"), py::arg("X"), py::call_guard<py::gil_scoped_release>());
     m.def("gp4ps", &gp4ps_wrapper, py::arg("p"), py::arg("x"), py::arg("X"), py::arg("filter_solutions"),
