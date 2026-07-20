@@ -19,4 +19,8 @@ int relpose_1aff(const Eigen::Vector3d &x1, const Eigen::Vector3d &x2, const Eig
 int relpose_1aff(const Eigen::Vector3d &x1, const Eigen::Vector3d &x2, const Eigen::Vector3d &n1, const Eigen::Vector3d &n2, const Eigen::Matrix2d &A,
                 std::vector<CameraPose> *output);
 
+// Computes the essential matrix and shared focal from one affine correspondence and two point normals.
+int relpose_1aff_focal(const Eigen::Vector3d &x1, const Eigen::Vector3d &x2, const Eigen::Vector3d &n1, const Eigen::Vector3d &n2, const Eigen::Matrix2d &A,
+                ImagePairVector *output);
+
 }; // namespace poselib

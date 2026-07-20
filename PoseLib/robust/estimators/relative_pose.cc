@@ -36,6 +36,7 @@
 #include "PoseLib/solvers/relpose_1aff.h"
 #include "PoseLib/solvers/relpose_2aff.h"
 #include "PoseLib/solvers/relpose_6pt_focal.h"
+#include "PoseLib/solvers/relpose_2aff_focal.h"
 #include "PoseLib/solvers/relpose_7pt.h"
 #include "PoseLib/solvers/relpose_k2Fk1_10pt.h"
 #include "PoseLib/solvers/relpose_kFk_9pt.h"
@@ -299,6 +300,58 @@ double SharedFocalRelativePoseEstimator::score_model(const ImagePair &image_pair
 }
 
 void SharedFocalRelativePoseEstimator::refine_model(ImagePair *image_pair) const {
+    BundleOptions bundle_opt;
+    bundle_opt.loss_type = BundleOptions::LossType::TRUNCATED;
+    bundle_opt.loss_scale = opt.max_error;
+    bundle_opt.max_iterations = 25;
+
+    Eigen::DiagonalMatrix<double, 3> K_inv(1.0, 1.0, image_pair->camera1.focal());
+    Eigen::Matrix3d E;
+    essential_from_motion(image_pair->pose, &E);
+    Eigen::Matrix3d F = K_inv * (E * K_inv);
+
+    // Find approximate inliers and bundle over these with a truncated loss
+    std::vector<char> inliers;
+    int num_inl = get_inliers(F, x1, x2, 5 * (opt.max_error * opt.max_error), &inliers);
+    std::vector<Eigen::Vector2d> x1_inlier, x2_inlier;
+    x1_inlier.reserve(num_inl);
+    x2_inlier.reserve(num_inl);
+
+    if (num_inl <= 6) {
+        return;
+    }
+
+    for (size_t pt_k = 0; pt_k < x1.size(); ++pt_k) {
+        if (inliers[pt_k]) {
+            x1_inlier.push_back(x1[pt_k]);
+            x2_inlier.push_back(x2[pt_k]);
+        }
+    }
+
+    refine_shared_focal_relpose(x1_inlier, x2_inlier, image_pair, bundle_opt);
+}
+
+void SharedFocalRelativePoseAffineEstimator::generate_models(ImagePairVector *models) {
+    models->clear();
+    sampler.generate_sample(&sample);
+    for (size_t k = 0; k < sample_sz; ++k) {
+        x1s[k] = x1[sample[k]].homogeneous().normalized();
+        x2s[k] = x2[sample[k]].homogeneous().normalized();
+        As[k] = A[sample[k]];
+    }
+    relpose_2aff_shared_focal(x1s, x2s, As, models);
+}
+
+double SharedFocalRelativePoseAffineEstimator::score_model(const ImagePair &image_pair, size_t *inlier_count) const {
+    Eigen::DiagonalMatrix<double, 3> K_inv(1.0, 1.0, image_pair.camera1.focal());
+    Eigen::Matrix3d E;
+    essential_from_motion(image_pair.pose, &E);
+    Eigen::Matrix3d F = K_inv * (E * K_inv);
+
+    return compute_sampson_msac_score(F, x1, x2, opt.max_error * opt.max_error, inlier_count);
+}
+
+void SharedFocalRelativePoseAffineEstimator::refine_model(ImagePair *image_pair) const {
     BundleOptions bundle_opt;
     bundle_opt.loss_type = BundleOptions::LossType::TRUNCATED;
     bundle_opt.loss_scale = opt.max_error;

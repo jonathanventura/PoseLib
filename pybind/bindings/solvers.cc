@@ -227,6 +227,14 @@ ImagePairVector shared_focal_relpose_6pt_wrapper(const std::vector<Eigen::Vector
     return output;
 }
 
+ImagePairVector shared_focal_relpose_2aff_wrapper(const std::vector<Eigen::Vector3d> &x1,
+                                                 const std::vector<Eigen::Vector3d> &x2,
+                                                const std::vector<Eigen::Matrix2d> &A) {
+    ImagePairVector output;
+    relpose_2aff_shared_focal(x1, x2, A, &output);
+    return output;
+}
+
 std::vector<MonoDepthImagePair> shared_focal_monodepth_relpose_3pt_wrapper(const std::vector<Eigen::Vector3d> &x1,
                                                                            const std::vector<Eigen::Vector3d> &x2,
                                                                            const std::vector<double> &d1,
@@ -349,6 +357,8 @@ void register_solvers(py::module &m) {
     m.def("essential_matrix_5pt", &essential_matrix_relpose_5pt_wrapper, py::arg("x1"), py::arg("x2"),
           py::call_guard<py::gil_scoped_release>());
     m.def("shared_focal_relpose_6pt", &shared_focal_relpose_6pt_wrapper, py::arg("x1"), py::arg("x2"),
+          py::call_guard<py::gil_scoped_release>());
+    m.def("shared_focal_relpose_2aff", &shared_focal_relpose_2aff_wrapper, py::arg("x1"), py::arg("x2"), py::arg("A"),
           py::call_guard<py::gil_scoped_release>());
     m.def("shared_focal_monodepth_pose_3pt", &shared_focal_monodepth_relpose_3pt_wrapper, py::arg("x1"), py::arg("x2"),
           py::arg("d1"), py::arg("d2"), py::call_guard<py::gil_scoped_release>());
