@@ -284,6 +284,30 @@ RansacStats ransac_shared_focal_relpose_affine(const std::vector<Point2D> &x1, c
     return stats;
 }
 
+RansacStats ransac_shared_focal_relpose_affine_two_normals(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, const std::vector<Eigen::Matrix2d> &A,
+    const std::vector<Eigen::Vector3d> &n1,  const std::vector<Eigen::Vector3d> &n2, 
+                                        const RelativePoseOptions &opt, ImagePair *best_model,
+                                        std::vector<char> *best_inliers) {
+    if (!opt.ransac.score_initial_model) {
+        best_model->pose.q << 1.0, 0.0, 0.0, 0.0;
+        best_model->pose.t.setZero();
+        best_model->camera1 = Camera(SimplePinholeCameraModel::model_id, std::vector<double>{1.0, 0.0, 0.0}, -1, -1);
+        best_model->camera2 = best_model->camera1;
+    }
+    SharedFocalRelativePoseAffineTwoNormalsEstimator estimator(opt, x1, x2, A, n1, n2);
+    RansacStats stats = ransac<SharedFocalRelativePoseAffineTwoNormalsEstimator>(estimator, opt.ransac, best_model);
+
+    Eigen::Matrix3d K_inv;
+    K_inv << 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, best_model->camera1.focal();
+    Eigen::Matrix3d E;
+    essential_from_motion(best_model->pose, &E);
+    Eigen::Matrix3d F = K_inv * (E * K_inv);
+
+    get_inliers(F, x1, x2, opt.max_error * opt.max_error, best_inliers);
+
+    return stats;
+}
+
 RansacStats ransac_shared_focal_monodepth_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                                   const std::vector<double> &d1, const std::vector<double> &d2,
                                                   const MonoDepthRelativePoseOptions &opt,
@@ -342,6 +366,24 @@ RansacStats ransac_fundamental(const std::vector<Point2D> &x1, const std::vector
 
     return stats;
 }
+
+RansacStats ransac_fundamental_affine(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                               const std::vector<Eigen::Matrix2d> &A,
+                               const RelativePoseOptions &opt, Eigen::Matrix3d *best_model,
+                               std::vector<char> *best_inliers) {
+
+    if (!opt.ransac.score_initial_model) {
+        best_model->setIdentity();
+    }
+    RansacStats stats;
+
+    FundamentalAffineEstimator estimator(opt, x1, x2, A);
+    stats = ransac<FundamentalAffineEstimator, Eigen::Matrix3d>(estimator, opt.ransac, best_model);
+    get_inliers(*best_model, x1, x2, opt.max_error * opt.max_error, best_inliers);
+
+    return stats;
+}
+
 
 RansacStats ransac_rd_fundamental(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                   std::vector<double> &ks, const double min_k, const double max_k,

@@ -670,6 +670,67 @@ RansacStats estimate_shared_focal_relative_pose_affine(const std::vector<Point2D
     return stats;
 }
 
+RansacStats estimate_shared_focal_relative_pose_affine_two_normals(const std::vector<Point2D> &points2D_1,
+                                                const std::vector<Point2D> &points2D_2, const std::vector<Eigen::Matrix2d> &affine_12, 
+                                                const std::vector<Eigen::Vector3d> &normals_1, const std::vector<Eigen::Vector3d> &normals_2, const Point2D &pp,
+                                                const RelativePoseOptions &opt, ImagePair *image_pair,
+                                                std::vector<char> *inliers) {
+
+    const size_t num_pts = points2D_1.size();
+
+    Eigen::Matrix3d T1, T2;
+    std::vector<Point2D> x1_norm = points2D_1;
+    std::vector<Point2D> x2_norm = points2D_2;
+
+    for (size_t i = 0; i < x1_norm.size(); i++) {
+        x1_norm[i] -= pp;
+        x2_norm[i] -= pp;
+    }
+
+    // We normalize points here to improve conditioning. Note that the normalization
+    // only amounts to a uniform rescaling of the image coordinate system
+    // and the cost we minimize is equivalent to the cost in the original image
+    // We do not perform shifting as we require pp to remain at [0, 0]
+    double scale = normalize_points(x1_norm, x2_norm, T1, T2, true, false, true);
+
+    RelativePoseOptions opt_scaled = opt;
+    opt_scaled.max_error /= scale;
+    opt_scaled.bundle.loss_scale /= scale;
+
+    if (opt.ransac.score_initial_model) {
+        image_pair->camera1 = Camera(SimplePinholeCameraModel::model_id,
+                                     std::vector<double>{image_pair->camera1.focal() / scale, 0.0, 0.0}, -1, -1);
+        image_pair->camera2 = Camera(SimplePinholeCameraModel::model_id,
+                                     std::vector<double>{image_pair->camera2.focal() / scale, 0.0, 0.0}, -1, -1);
+    }
+
+    RansacStats stats = ransac_shared_focal_relpose_affine_two_normals(x1_norm, x2_norm, affine_12, normals_1, normals_2, opt_scaled, image_pair, inliers);
+
+    if (stats.num_inliers > 6) {
+        std::vector<Point2D> x1_inliers;
+        std::vector<Point2D> x2_inliers;
+        x1_inliers.reserve(stats.num_inliers);
+        x2_inliers.reserve(stats.num_inliers);
+
+        for (size_t k = 0; k < num_pts; ++k) {
+            if (!(*inliers)[k])
+                continue;
+            x1_inliers.push_back(x1_norm[k]);
+            x2_inliers.push_back(x2_norm[k]);
+        }
+
+        refine_shared_focal_relpose(x1_inliers, x2_inliers, image_pair, opt_scaled.bundle);
+    }
+
+    image_pair->camera1.params[0] *= scale;
+    image_pair->camera1.params[1] = pp(0);
+    image_pair->camera1.params[2] = pp(1);
+
+    image_pair->camera2 = image_pair->camera1;
+
+    return stats;
+}
+
 RansacStats estimate_shared_focal_monodepth_relative_pose(const std::vector<Point2D> &points2D_1,
                                                           const std::vector<Point2D> &points2D_2,
                                                           const std::vector<double> &depth_1,
@@ -839,6 +900,59 @@ RansacStats estimate_fundamental(const std::vector<Point2D> &x1, const std::vect
 
     return stats;
 }
+
+RansacStats estimate_fundamental_affine(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, const std::vector<Eigen::Matrix2d> &A,
+                                 const RelativePoseOptions &opt, Eigen::Matrix3d *F, std::vector<char> *inliers) {
+
+    const size_t num_pts = x1.size();
+    if (num_pts < 7) {
+        return RansacStats();
+    }
+
+    // We normalize points here to improve conditioning. Note that the normalization
+    // only ammounts to a uniform rescaling and shift of the image coordinate system
+    // and the cost we minimize is equivalent to the cost in the original image
+    // for RFC we do not perform the shift as the pp needs to remain at [0, 0]
+
+    Eigen::Matrix3d T1, T2;
+    std::vector<Point2D> x1_norm = x1;
+    std::vector<Point2D> x2_norm = x2;
+
+    double scale = normalize_points(x1_norm, x2_norm, T1, T2, true, !opt.real_focal_check, true);
+    RelativePoseOptions opt_scaled = opt;
+    opt_scaled.max_error /= scale;
+    opt_scaled.bundle.loss_scale /= scale;
+
+    if (opt.ransac.score_initial_model) {
+        *F = T2.transpose().inverse() * (*F) * T1.inverse();
+        *F /= F->norm();
+    }
+
+    RansacStats stats = ransac_fundamental_affine(x1_norm, x2_norm, A, opt_scaled, F, inliers);
+
+    if (stats.num_inliers > 7) {
+        // Collect inlier for additional non-linear refinement
+        std::vector<Point2D> x1_inliers;
+        std::vector<Point2D> x2_inliers;
+        x1_inliers.reserve(stats.num_inliers);
+        x2_inliers.reserve(stats.num_inliers);
+
+        for (size_t k = 0; k < num_pts; ++k) {
+            if (!(*inliers)[k])
+                continue;
+            x1_inliers.push_back(x1_norm[k]);
+            x2_inliers.push_back(x2_norm[k]);
+        }
+
+        refine_fundamental(x1_inliers, x2_inliers, F, opt_scaled.bundle);
+    }
+
+    *F = T2.transpose() * (*F) * T1;
+    *F /= F->norm();
+
+    return stats;
+}
+
 
 RansacStats estimate_rd_fundamental(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                     std::vector<double> ks, const RelativePoseOptions &opt,

@@ -35,6 +35,7 @@
 #include "PoseLib/solvers/relpose_5pt.h"
 #include "PoseLib/solvers/relpose_1aff.h"
 #include "PoseLib/solvers/relpose_2aff.h"
+#include "PoseLib/solvers/relpose_3aff.h"
 #include "PoseLib/solvers/relpose_6pt_focal.h"
 #include "PoseLib/solvers/relpose_2aff_focal.h"
 #include "PoseLib/solvers/relpose_7pt.h"
@@ -383,6 +384,60 @@ void SharedFocalRelativePoseAffineEstimator::refine_model(ImagePair *image_pair)
     refine_shared_focal_relpose(x1_inlier, x2_inlier, image_pair, bundle_opt);
 }
 
+void SharedFocalRelativePoseAffineTwoNormalsEstimator::generate_models(ImagePairVector *models) {
+    models->clear();
+    sampler.generate_sample(&sample);
+    for (size_t k = 0; k < sample_sz; ++k) {
+        x1s[k] = x1[sample[k]].homogeneous().normalized();
+        x2s[k] = x2[sample[k]].homogeneous().normalized();
+        As[k] = A[sample[k]];
+        n1s[k] = n1[sample[k]].normalized();
+        n2s[k] = n2[sample[k]].normalized();
+    }
+    relpose_1aff_focal(x1s[0], x2s[0], n1s[0], n2s[0], As[0], models);
+}
+
+double SharedFocalRelativePoseAffineTwoNormalsEstimator::score_model(const ImagePair &image_pair, size_t *inlier_count) const {
+    Eigen::DiagonalMatrix<double, 3> K_inv(1.0, 1.0, image_pair.camera1.focal());
+    Eigen::Matrix3d E;
+    essential_from_motion(image_pair.pose, &E);
+    Eigen::Matrix3d F = K_inv * (E * K_inv);
+
+    return compute_sampson_msac_score(F, x1, x2, opt.max_error * opt.max_error, inlier_count);
+}
+
+void SharedFocalRelativePoseAffineTwoNormalsEstimator::refine_model(ImagePair *image_pair) const {
+    BundleOptions bundle_opt;
+    bundle_opt.loss_type = BundleOptions::LossType::TRUNCATED;
+    bundle_opt.loss_scale = opt.max_error;
+    bundle_opt.max_iterations = 25;
+
+    Eigen::DiagonalMatrix<double, 3> K_inv(1.0, 1.0, image_pair->camera1.focal());
+    Eigen::Matrix3d E;
+    essential_from_motion(image_pair->pose, &E);
+    Eigen::Matrix3d F = K_inv * (E * K_inv);
+
+    // Find approximate inliers and bundle over these with a truncated loss
+    std::vector<char> inliers;
+    int num_inl = get_inliers(F, x1, x2, 5 * (opt.max_error * opt.max_error), &inliers);
+    std::vector<Eigen::Vector2d> x1_inlier, x2_inlier;
+    x1_inlier.reserve(num_inl);
+    x2_inlier.reserve(num_inl);
+
+    if (num_inl <= 6) {
+        return;
+    }
+
+    for (size_t pt_k = 0; pt_k < x1.size(); ++pt_k) {
+        if (inliers[pt_k]) {
+            x1_inlier.push_back(x1[pt_k]);
+            x2_inlier.push_back(x2[pt_k]);
+        }
+    }
+
+    refine_shared_focal_relpose(x1_inlier, x2_inlier, image_pair, bundle_opt);
+}
+
 void SharedFocalMonodepthPoseEstimator::generate_models(std::vector<MonoDepthImagePair> *models) {
     models->clear();
     sampler.generate_sample(&sample);
@@ -584,6 +639,37 @@ double FundamentalEstimator::score_model(const Eigen::Matrix3d &F, size_t *inlie
 }
 
 void FundamentalEstimator::refine_model(Eigen::Matrix3d *F) const {
+    BundleOptions bundle_opt;
+    bundle_opt.loss_type = BundleOptions::LossType::TRUNCATED;
+    bundle_opt.loss_scale = opt.max_error;
+    bundle_opt.max_iterations = 25;
+
+    refine_fundamental(x1, x2, F, bundle_opt);
+}
+
+void FundamentalAffineEstimator::generate_models(std::vector<Eigen::Matrix3d> *models) {
+    models->clear();
+    sampler.generate_sample(&sample);
+    for (size_t k = 0; k < sample_sz; ++k) {
+        x1s[k] = x1[sample[k]].homogeneous().normalized();
+        x2s[k] = x2[sample[k]].homogeneous().normalized();
+        As[k] = A[sample[k]];
+    }
+    relpose_3aff(x1s, x2s, As, models);
+
+    if (opt.real_focal_check) {
+        for (int i = models->size() - 1; i >= 0; i--) {
+            if (!calculate_RFC((*models)[i]))
+                models->erase(models->begin() + i);
+        }
+    }
+}
+
+double FundamentalAffineEstimator::score_model(const Eigen::Matrix3d &F, size_t *inlier_count) const {
+    return compute_sampson_msac_score(F, x1, x2, opt.max_error * opt.max_error, inlier_count);
+}
+
+void FundamentalAffineEstimator::refine_model(Eigen::Matrix3d *F) const {
     BundleOptions bundle_opt;
     bundle_opt.loss_type = BundleOptions::LossType::TRUNCATED;
     bundle_opt.loss_scale = opt.max_error;

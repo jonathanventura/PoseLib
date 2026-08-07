@@ -318,6 +318,44 @@ class SharedFocalRelativePoseAffineEstimator {
     std::vector<size_t> sample;
 };
 
+class SharedFocalRelativePoseAffineTwoNormalsEstimator {
+  public:
+    SharedFocalRelativePoseAffineTwoNormalsEstimator(const RelativePoseOptions &opt, const std::vector<Point2D> &points2D_1, 
+                                     const std::vector<Point2D> &points2D_2, const std::vector<Eigen::Matrix2d> &affine_12,
+                                     const std::vector<Eigen::Vector3d> &normals_1, const std::vector<Eigen::Vector3d> &normals_2)
+        : num_data(points2D_1.size()), opt(opt), x1(points2D_1), x2(points2D_2), A(affine_12), n1(normals_1), n2(normals_2),
+          sampler(num_data, sample_sz, opt.ransac) {
+        x1s.resize(sample_sz);
+        x2s.resize(sample_sz);
+        As.resize(sample_sz);
+        n1s.resize(sample_sz);
+        n2s.resize(sample_sz);
+        sample.resize(sample_sz);
+    }
+
+    void generate_models(ImagePairVector *models);
+    double score_model(const ImagePair &image_pair, size_t *inlier_count) const;
+    void refine_model(ImagePair *image_pair) const;
+
+    const size_t sample_sz = 1;
+    const size_t num_data;
+
+  private:
+    const RelativePoseOptions &opt;
+    const std::vector<Point2D> &x1;
+    const std::vector<Point2D> &x2;
+    const std::vector<Eigen::Matrix2d> &A;
+    const std::vector<Eigen::Vector3d> &n1;
+    const std::vector<Eigen::Vector3d> &n2;
+
+    RandomSampler sampler;
+    // pre-allocated vectors for sampling
+    std::vector<Eigen::Vector3d> x1s, x2s;
+    std::vector<Eigen::Matrix2d> As;
+    std::vector<Eigen::Vector3d> n1s, n2s;
+    std::vector<size_t> sample;
+};
+
 class SharedFocalMonodepthPoseEstimator {
   public:
     SharedFocalMonodepthPoseEstimator(const MonoDepthRelativePoseOptions &options,
@@ -478,6 +516,39 @@ class FundamentalEstimator {
     std::vector<Eigen::Vector3d> x1s, x2s;
     std::vector<size_t> sample;
 };
+
+class FundamentalAffineEstimator {
+  public:
+    FundamentalAffineEstimator(const RelativePoseOptions &opt, const std::vector<Point2D> &points2D_1,
+                         const std::vector<Point2D> &points2D_2, const std::vector<Eigen::Matrix2d> &affine2D_12)
+        : num_data(points2D_1.size()), opt(opt), x1(points2D_1), x2(points2D_2), A(affine2D_12),
+          sampler(num_data, sample_sz, opt.ransac) {
+        x1s.resize(sample_sz);
+        x2s.resize(sample_sz);
+        As.resize(sample_sz);
+        sample.resize(sample_sz);
+    }
+
+    void generate_models(std::vector<Eigen::Matrix3d> *models);
+    double score_model(const Eigen::Matrix3d &F, size_t *inlier_count) const;
+    void refine_model(Eigen::Matrix3d *F) const;
+
+    const size_t sample_sz = 3;
+    const size_t num_data;
+
+  private:
+    const RelativePoseOptions &opt;
+    const std::vector<Point2D> &x1;
+    const std::vector<Point2D> &x2;
+    const std::vector<Eigen::Matrix2d> &A;
+
+    RandomSampler sampler;
+    // pre-allocated vectors for sampling
+    std::vector<Eigen::Vector3d> x1s, x2s;
+    std::vector<Eigen::Matrix2d> As;
+    std::vector<size_t> sample;
+};
+
 
 class RDFundamentalEstimator {
   public:

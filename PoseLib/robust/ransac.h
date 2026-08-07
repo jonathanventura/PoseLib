@@ -88,6 +88,11 @@ RansacStats ransac_shared_focal_relpose_affine(const std::vector<Point2D> &x1, c
                                         const RelativePoseOptions &opt, ImagePair *best_model,
                                         std::vector<char> *best_inliers);
 
+RansacStats ransac_shared_focal_relpose_affine_two_normals(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2, const std::vector<Eigen::Matrix2d> &A,
+                                        const std::vector<Eigen::Vector3d> &n1, const std::vector<Eigen::Vector3d> &n2,
+                                        const RelativePoseOptions &opt, ImagePair *best_model,
+                                        std::vector<char> *best_inliers);
+
 RansacStats ransac_shared_focal_monodepth_relpose(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
                                                   const std::vector<double> &d1, const std::vector<double> &d2,
                                                   const MonoDepthRelativePoseOptions &opt,
@@ -99,6 +104,11 @@ RansacStats ransac_varying_focal_monodepth_relpose(const std::vector<Point2D> &x
                                                    MonoDepthImagePair *best_model, std::vector<char> *best_inliers);
 
 RansacStats ransac_fundamental(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                               const RelativePoseOptions &opt, Eigen::Matrix3d *best_model,
+                               std::vector<char> *best_inliers);
+
+RansacStats ransac_fundamental_affine(const std::vector<Point2D> &x1, const std::vector<Point2D> &x2,
+                               const std::vector<Eigen::Matrix2d> &A,
                                const RelativePoseOptions &opt, Eigen::Matrix3d *best_model,
                                std::vector<char> *best_inliers);
 

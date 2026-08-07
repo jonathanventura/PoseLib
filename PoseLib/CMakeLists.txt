@@ -35,6 +35,7 @@ set(SOURCES
     solvers/relpose_5pt.cc
     solvers/relpose_1aff.cc
     solvers/relpose_2aff.cc
+    solvers/relpose_3aff.cc
     solvers/relpose_monodepth_3pt.cc
     solvers/relpose_7pt.cc
     solvers/relpose_6pt_focal.cc

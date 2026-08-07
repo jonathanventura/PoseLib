@@ -273,6 +273,38 @@ estimate_shared_focal_relative_pose_affine_wrapper(const std::vector<Eigen::Vect
     return std::make_pair(image_pair, output_dict);
 }
 
+std::pair<ImagePair, py::dict>
+estimate_shared_focal_relative_pose_affine_two_normals_wrapper(const std::vector<Eigen::Vector2d> &points2D_1,
+                                            const std::vector<Eigen::Vector2d> &points2D_2, const std::vector<Eigen::Matrix2d> &affine_12, 
+                                            const std::vector<Eigen::Vector3d> &normals_1, const std::vector<Eigen::Vector3d> &normals_2, 
+                                            const Eigen::Vector2d &pp,
+                                            const py::dict &opt_dict,
+                                            const std::optional<ImagePair> &initial_image_pair) {
+
+    RelativePoseOptions opt;
+    update_relative_pose_options(opt_dict, opt);
+
+    ImagePair image_pair;
+    if (initial_image_pair.has_value()) {
+        image_pair = initial_image_pair.value();
+        opt.ransac.score_initial_model = true;
+    }
+
+    std::vector<char> inlier_mask;
+
+    std::vector<Image> output;
+
+    py::gil_scoped_release release;
+    RansacStats stats = estimate_shared_focal_relative_pose_affine_two_normals(points2D_1, points2D_2, affine_12, normals_1, normals_2, pp, opt,
+                                                            &image_pair, &inlier_mask);
+    py::gil_scoped_acquire acquire;
+
+    py::dict output_dict;
+    write_to_dict(stats, output_dict);
+    output_dict["inliers"] = convert_inlier_vector(inlier_mask);
+    return std::make_pair(image_pair, output_dict);
+}
+
 std::pair<MonoDepthImagePair, py::dict> estimate_monodepth_shared_focal_relative_pose_wrapper(
     const std::vector<Eigen::Vector2d> &points2D_1, const std::vector<Eigen::Vector2d> &points2D_2,
     const std::vector<double> &depth_1, const std::vector<double> &depth_2, const py::dict &opt_dict,
@@ -396,6 +428,30 @@ std::pair<Eigen::Matrix3d, py::dict> estimate_fundamental_wrapper(const std::vec
     return std::make_pair(F, output_dict);
 }
 
+std::pair<Eigen::Matrix3d, py::dict> estimate_fundamental_affine_wrapper(const std::vector<Eigen::Vector2d> &points2D_1,
+                                                                  const std::vector<Eigen::Vector2d> &points2D_2,
+                                                                  const std::vector<Eigen::Matrix2d> &affine2D_12,
+                                                                  const py::dict &opt_dict,
+                                                                  const std::optional<Eigen::Matrix3d> &initial_F) {
+    RelativePoseOptions opt;
+    update_relative_pose_options(opt_dict, opt);
+
+    Eigen::Matrix3d F;
+    if (initial_F.has_value()) {
+        F = initial_F.value();
+        opt.ransac.score_initial_model = true;
+    }
+    std::vector<char> inlier_mask;
+
+    py::gil_scoped_release release;
+    RansacStats stats = estimate_fundamental_affine(points2D_1, points2D_2, affine2D_12, opt, &F, &inlier_mask);
+    py::gil_scoped_acquire acquire;
+
+    py::dict output_dict;
+    write_to_dict(stats, output_dict);
+    output_dict["inliers"] = convert_inlier_vector(inlier_mask);
+    return std::make_pair(F, output_dict);
+}
 std::pair<Eigen::Matrix3d, py::dict> refine_fundamental_wrapper(const std::vector<Eigen::Vector2d> &points2D_1,
                                                                 const std::vector<Eigen::Vector2d> &points2D_2,
                                                                 const Eigen::Matrix3d &initial_F,
@@ -652,6 +708,11 @@ void register_relative_pose(py::module &m) {
           py::arg("initial_image_pair") = py::none(),
           "Relative pose estimation with unknown equal focal lengths with non-linear refinement.");
 
+    m.def("estimate_shared_focal_relative_pose_affine_two_normals", &estimate_shared_focal_relative_pose_affine_two_normals_wrapper, py::arg("points2D_1"),
+          py::arg("points2D_2"), py::arg("affine_12"), py::arg("normals_1"), py::arg("normals_2"), py::arg("pp") = Eigen::Vector2d::Zero(), py::arg("opt") = py::dict(),
+          py::arg("initial_image_pair") = py::none(),
+          "Relative pose estimation with unknown equal focal lengths with non-linear refinement.");
+
     m.def("estimate_monodepth_shared_focal_relative_pose", &estimate_monodepth_shared_focal_relative_pose_wrapper,
           py::arg("points2D_1"), py::arg("points2D_2"), py::arg("depth_1"), py::arg("depth_2"),
           py::arg("opt") = py::dict(),
@@ -666,6 +727,11 @@ void register_relative_pose(py::module &m) {
           "refinement.");
 
     m.def("estimate_fundamental", &estimate_fundamental_wrapper, py::arg("points2D_1"), py::arg("points2D_2"),
+          py::arg("opt") = py::dict(), py::arg("initial_F") = py::none(),
+          "Fundamental matrix estimation with non-linear refinement. Note: if you have known intrinsics you should use "
+          "estimate_relative_pose instead!");
+
+    m.def("estimate_fundamental_affine", &estimate_fundamental_affine_wrapper, py::arg("points2D_1"), py::arg("points2D_2"), py::arg("affine2D_12"),
           py::arg("opt") = py::dict(), py::arg("initial_F") = py::none(),
           "Fundamental matrix estimation with non-linear refinement. Note: if you have known intrinsics you should use "
           "estimate_relative_pose instead!");

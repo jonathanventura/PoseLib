@@ -116,6 +116,14 @@ RansacStats estimate_shared_focal_relative_pose_affine(const std::vector<Point2D
                                                 const RelativePoseOptions &opt, ImagePair *image_pair,
                                                 std::vector<char> *inliers);
 
+// Estimates relative pose with shared unknown focal length using LO-RANSAC followed by non-linear refinement
+// Threshold for Sampson error is set by RansacOptions.max_epipolar_error
+RansacStats estimate_shared_focal_relative_pose_affine_two_normals(const std::vector<Point2D> &points2D_1,
+                                                const std::vector<Point2D> &points2D_2, const std::vector<Eigen::Matrix2d> &affine_12, const std::vector<Eigen::Vector3d> &normals_1, const std::vector<Eigen::Vector3d> &normals_2, const Point2D &pp,
+                                                const RelativePoseOptions &opt, ImagePair *image_pair,
+                                                std::vector<char> *inliers);
+
+
 // Estimates relative pose with shared unknown focal length from point correspondences with estimated monodepth
 // using LO-RANSAC followed by non-linear refinement. The points are assumed to be normalized such that pp = [0,0].
 // Uses hybrid scoring with reprojection and epipolar errors
@@ -140,6 +148,12 @@ RansacStats estimate_varying_focal_monodepth_relative_pose(const std::vector<Poi
 // NOTE: USE estimate_relative_pose IF YOU KNOW THE INTRINSICS!!!
 // Threshold for Sampson error is set by RansacOptions.max_epipolar_error
 RansacStats estimate_fundamental(const std::vector<Point2D> &points2D_1, const std::vector<Point2D> &points2D_2,
+                                 const RelativePoseOptions &opt, Eigen::Matrix3d *F, std::vector<char> *inliers);
+
+// Estimates a fundamental matrix using LO-RANSAC followed by non-linear refinement
+// NOTE: USE estimate_relative_pose IF YOU KNOW THE INTRINSICS!!!
+// Threshold for Sampson error is set by RansacOptions.max_epipolar_error
+RansacStats estimate_fundamental_affine(const std::vector<Point2D> &points2D_1, const std::vector<Point2D> &points2D_2, const std::vector<Eigen::Matrix2d> &affine2D_12,
                                  const RelativePoseOptions &opt, Eigen::Matrix3d *F, std::vector<char> *inliers);
 
 // Estimates a fundamental matrix with the radial distortion of two cameras followed by non-linear refinement
